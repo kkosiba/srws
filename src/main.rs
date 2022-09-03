@@ -1,7 +1,20 @@
 use std::{
+    fs,
     io::{prelude::*, BufReader},
     net::{SocketAddr, TcpListener, TcpStream},
 };
+
+fn build_response() -> Result<String, Box<dyn std::error::Error>> {
+    let status_line: &'static str = "HTTP/1.1 200 OK";
+    let contents: String = fs::read_to_string("static/index.html")?;
+    let content_length: usize = contents.len();
+    let response: String = format!(
+        "{status_line}\r\n\
+        Content-Length: {content_length}\r\n\r\n\
+        {contents}"
+    );
+    Ok(response)
+}
 
 fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn std::error::Error>> {
     // from the docs:
@@ -22,7 +35,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn std::error::Er
 
     println!("Request: {:#?}", request);
 
-    let response = "HTTP/1.1 200 OK\r\n\r\n";
+    let response: String = build_response()?;
     stream.write_all(response.as_bytes())?;
     Ok(())
 }
@@ -38,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // accept connections and process them one by one
     for stream in listener.incoming() {
         // stream represents an open connection between client and server
-        handle_connection(stream?);
+        handle_connection(stream?)?;
     }
     Ok(())
 }
