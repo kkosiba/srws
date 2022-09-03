@@ -3,7 +3,7 @@ use std::{
     net::{SocketAddr, TcpListener, TcpStream},
 };
 
-fn handle_connection(mut stream: TcpStream) {
+fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn std::error::Error>> {
     // from the docs:
     // "A BufReader<R> performs large, infrequent reads on the underlying Read
     // and maintains an in-memory buffer of the results."
@@ -21,6 +21,10 @@ fn handle_connection(mut stream: TcpStream) {
         .collect();
 
     println!("Request: {:#?}", request);
+
+    let response = "HTTP/1.1 200 OK\r\n\r\n";
+    stream.write_all(response.as_bytes())?;
+    Ok(())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
