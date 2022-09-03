@@ -1,7 +1,24 @@
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::{
+    io::{prelude::*, BufReader},
+    net::{SocketAddr, TcpListener, TcpStream},
+};
 
-fn handle_connection(_stream: TcpStream) {
-    println!("Connection established!");
+fn handle_connection(mut stream: TcpStream) {
+    // from the docs:
+    // "A BufReader<R> performs large, infrequent reads on the underlying Read
+    // and maintains an in-memory buffer of the results."
+    let buf_reader = BufReader::new(&mut stream);
+
+    let request: Vec<String> = buf_reader
+        // returns an iterator over the lines of buf_reader
+        .lines()
+        .map(|result| result.unwrap())
+        // returns an iterator that yields lines from the reader when they're
+        // non-empty and ignores the rest
+        .take_while(|line| !line.is_empty())
+        .collect();
+
+    println!("Request: {:#?}", request);
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
