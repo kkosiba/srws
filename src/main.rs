@@ -12,7 +12,7 @@ fn handle_connection(mut stream: TcpStream) {
     let request: Vec<String> = buf_reader
         // returns an iterator over the lines of buf_reader
         .lines()
-        .map(|result| result.unwrap())
+        .map(|result| result.unwrap()) // todo: handle this more gracefully
         // returns an iterator that yields lines from the reader when they're
         // non-empty and ignores the rest
         .take_while(|line| !line.is_empty())
