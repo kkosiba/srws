@@ -15,6 +15,8 @@ fn handle_connection(mut stream: TcpStream) {
         .map(|result| result.unwrap()) // todo: handle this more gracefully
         // returns an iterator that yields lines from the reader when they're
         // non-empty and ignores the rest
+        // Note: we do this because the browser signals the end of HTTP request
+        //       by sending 2 newline characters in a row.
         .take_while(|line| !line.is_empty())
         .collect();
 
