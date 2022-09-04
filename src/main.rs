@@ -4,9 +4,17 @@ use std::{
     net::{SocketAddr, TcpListener, TcpStream},
 };
 
-fn build_response() -> Result<String, Box<dyn std::error::Error>> {
-    let status_line: &'static str = "HTTP/1.1 200 OK";
-    let contents: String = fs::read_to_string("static/index.html")?;
+fn determine_response(request_line: &str) -> (&str, &str) {
+    if request_line.contains("GET / HTTP/1.1") {
+        ("HTTP/1.1 200 OK", "index.html")
+    } else {
+        ("HTTP/1.1 404 NOT FOUND", "404.html")
+    }
+}
+
+fn build_response(request_line: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let (status_line, filename) = determine_response(request_line);
+    let contents: String = fs::read_to_string(format!("static/{filename}"))?;
     let content_length: usize = contents.len();
     let response: String = format!(
         "{status_line}\r\n\
@@ -21,21 +29,9 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn std::error::Er
     // "A BufReader<R> performs large, infrequent reads on the underlying Read
     // and maintains an in-memory buffer of the results."
     let buf_reader = BufReader::new(&mut stream);
-
-    let request: Vec<String> = buf_reader
-        // returns an iterator over the lines of buf_reader
-        .lines()
-        .map(|result| result.unwrap()) // todo: handle this more gracefully
-        // returns an iterator that yields lines from the reader when they're
-        // non-empty and ignores the rest
-        // Note: we do this because the browser signals the end of HTTP request
-        //       by sending 2 newline characters in a row.
-        .take_while(|line| !line.is_empty())
-        .collect();
-
-    println!("Request: {:#?}", request);
-
-    let response: String = build_response()?;
+    // todo: don't use unwrap() here, instead handle Option with match
+    let request_line = buf_reader.lines().next().unwrap()?;
+    let response: String = build_response(&request_line)?;
     stream.write_all(response.as_bytes())?;
     Ok(())
 }
