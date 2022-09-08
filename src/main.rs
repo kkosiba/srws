@@ -1,9 +1,9 @@
-extern crate ini;
-
-use ini::Ini;
+use chrono;
+use env_logger;
+use ini;
 use std::{
     error, fs,
-    io::{prelude::*, BufReader},
+    io::{prelude::*, BufReader, Write},
     net::{IpAddr, SocketAddr, TcpListener, TcpStream},
     path, result,
     str::FromStr,
@@ -32,16 +32,17 @@ fn build_response(request_line: &str) -> result::Result<String, Box<dyn error::E
 fn get_core_config(
     config_path: &path::Path,
 ) -> result::Result<(IpAddr, String), Box<dyn error::Error>> {
-    let config = Ini::load_from_file(config_path)?;
+    let config = ini::Ini::load_from_file(config_path)?;
     let core_section = config.section(Some("core")).unwrap();
-    let server_address = IpAddr::from_str(core_section.get("server_address").unwrap())?.into();
-    let port = core_section.get("port").unwrap();
+    let server_address =
+        IpAddr::from_str(core_section.get("server_address").unwrap_or("127.0.0.1"))?.into();
+    let port = core_section.get("port").unwrap_or("5006");
     Ok((server_address, port.to_string()))
 }
 
 fn get_listener(
     server_address: IpAddr,
-    port: String,
+    port: &str,
 ) -> result::Result<TcpListener, Box<dyn error::Error>> {
     let socket_address = SocketAddr::new(server_address, port.parse::<u16>()?);
     // create a TcpListener and bind it to the socket address on the specified port
@@ -58,16 +59,38 @@ fn handle_connection(mut stream: TcpStream) -> result::Result<(), Box<dyn error:
     let request_line = buf_reader.lines().next().unwrap()?;
     let response: String = build_response(&request_line)?;
     let response_first_line = response.lines().next().unwrap();
-    println!("{request_line} -- {response_first_line}");
+    log::info!("{request_line} -- {response_first_line}");
     stream.write_all(response.as_bytes())?;
     Ok(())
 }
 
+fn get_log_builder(format: Option<&'static str>) -> env_logger::Builder {
+    let mut builder = env_logger::Builder::new();
+    let log_format = format.unwrap_or("%Y-%m-%dT%H:%M:%S");
+    builder
+        .format(|buf, record| {
+            writeln!(
+                buf,
+                "{} [{}] - {}",
+                chrono::Local::now().format(log_format),
+                record.level(),
+                record.args()
+            )
+        })
+        .filter_level(log::LevelFilter::Info);
+    builder
+}
+
 fn main() -> result::Result<(), Box<dyn error::Error>> {
     let config_path = path::Path::new("config/server.conf");
+
+    // todo: read log format from the config
+    let mut log_builder = get_log_builder(None);
+    log_builder.init();
+
     let (server_address, port) = get_core_config(config_path)?;
-    let listener = get_listener(server_address, port)?;
-    println!("Listening on port {}...", &listener.local_addr()?.port());
+    let listener = get_listener(server_address, &port)?;
+    log::info!("Listening on {}:{}...", &server_address, &port,);
 
     // accept connections and process them one by one
     for stream in listener.incoming() {
