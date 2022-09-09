@@ -1,33 +1,18 @@
-use chrono;
-use env_logger;
-use ini;
+/* standard library imports */
 use std::{
-    error, fs,
+    error,
     io::{prelude::*, BufReader, Write},
     net::{IpAddr, SocketAddr, TcpListener, TcpStream},
     path, result,
     str::FromStr,
 };
 
-fn determine_response(request_line: &str) -> (&str, &str) {
-    // todo: read routing config from config/routes.conf
-    match request_line {
-        "GET / HTTP/1.1" => ("HTTP/1.1 200 OK", "index.html"),
-        _ => ("HTTP/1.1 404 NOT FOUND", "404.html"),
-    }
-}
+/* custom crates */
+use ini;
 
-fn build_response(request_line: &str) -> result::Result<String, Box<dyn error::Error>> {
-    let (status_line, filename) = determine_response(request_line);
-    let contents: String = fs::read_to_string(format!("static/{filename}"))?;
-    let content_length: usize = contents.len();
-    let response: String = format!(
-        "{status_line}\r\n\
-        Content-Length: {content_length}\r\n\r\n\
-        {contents}"
-    );
-    Ok(response)
-}
+/* local modules */
+mod logging;
+mod responses;
 
 fn get_core_config(
     config_path: &path::Path,
@@ -57,35 +42,18 @@ fn handle_connection(mut stream: TcpStream) -> result::Result<(), Box<dyn error:
     let buf_reader = BufReader::new(&mut stream);
     // todo: don't use unwrap() here, instead handle Option with match
     let request_line = buf_reader.lines().next().unwrap()?;
-    let response: String = build_response(&request_line)?;
+    let response: String = responses::build_response(&request_line)?;
     let response_first_line = response.lines().next().unwrap();
     log::info!("{request_line} -- {response_first_line}");
     stream.write_all(response.as_bytes())?;
     Ok(())
 }
 
-fn get_log_builder(format: Option<&'static str>) -> env_logger::Builder {
-    let mut builder = env_logger::Builder::new();
-    let log_format = format.unwrap_or("%Y-%m-%dT%H:%M:%S");
-    builder
-        .format(|buf, record| {
-            writeln!(
-                buf,
-                "{} [{}] - {}",
-                chrono::Local::now().format(log_format),
-                record.level(),
-                record.args()
-            )
-        })
-        .filter_level(log::LevelFilter::Info);
-    builder
-}
-
 fn main() -> result::Result<(), Box<dyn error::Error>> {
     let config_path = path::Path::new("config/server.conf");
 
     // todo: read log format from the config
-    let mut log_builder = get_log_builder(None);
+    let mut log_builder = logging::get_log_builder(None);
     log_builder.init();
 
     let (server_address, port) = get_core_config(config_path)?;
