@@ -7,9 +7,6 @@ use std::{
     str::FromStr,
 };
 
-/* custom crates */
-use ini;
-
 /* local modules */
 mod logging;
 mod responses;
@@ -20,7 +17,7 @@ fn get_core_config(
     let config = ini::Ini::load_from_file(config_path)?;
     let core_section = config.section(Some("core")).unwrap();
     let server_address =
-        IpAddr::from_str(core_section.get("server_address").unwrap_or("127.0.0.1"))?.into();
+        IpAddr::from_str(core_section.get("server_address").unwrap_or("127.0.0.1"))?;
     let port = core_section.get("port").unwrap_or("5006");
     Ok((server_address, port.to_string()))
 }
